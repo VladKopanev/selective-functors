@@ -1,6 +1,6 @@
 package com.kopanev.cats.selective
 
-import cats.{Applicative, Monoid, Show}
+import cats.{Applicative, Monoid, MonoidK, Show}
 
 trait Selective[F[_]] extends Applicative[F] {
 
@@ -43,6 +43,10 @@ object Selective {
 
   def apply[M[_] : Selective]: Selective[M] = implicitly[Selective[M]]
 
+  def ifS[F[_] : Selective, A](f: F[Boolean])(left: F[A])(right: F[A]): F[A] = Selective[F].ifS(f)(left)(right)
+
+  def whenS[F[_] : Selective](f: F[Boolean])(left: F[Unit])(right: F[Unit]): F[Unit] = Selective[F].whenS(f)(left)(right)
+
   implicit def catsSelectiveInstanceForOver[M: Monoid, B]: Selective[Over[M, ?]] = new Selective[Over[M, ?]] {
 
     override def pure[A](x: A): Over[M, A] = Over[M, A](Monoid[M].empty)
@@ -66,9 +70,16 @@ object Selective {
   }
 
   implicit def showInstanceForOver[M, A]: Show[Over[M, A]] = _.toString
+
   implicit def showInstanceForUnder[M, A]: Show[Under[M, A]] = _.toString
 
-  def ifS[F[_] : Selective, A](f: F[Boolean])(left: F[A])(right: F[A]): F[A] = Selective[F].ifS(f)(left)(right)
+  implicit def monoidKInstanceForOver[M: Monoid, A]: MonoidK[Over[M, ?]] = new MonoidK[Over[M, ?]] {
+    override def empty[A]: Over[M, A] = Over[M, A](Monoid[M].empty)
+    override def combineK[A](x: Over[M, A], y: Over[M, A]): Over[M, A] = Over(Monoid[M].combine(x.getOver, y.getOver))
+  }
 
-  def whenS[F[_] : Selective](f: F[Boolean])(left: F[Unit])(right: F[Unit]): F[Unit] = Selective[F].whenS(f)(left)(right)
+  implicit def monoidKInstanceForUnder[M: Monoid, A]: MonoidK[Under[M, ?]] = new MonoidK[Under[M, ?]] {
+    override def empty[A]: Under[M, A] = Under[M, A](Monoid[M].empty)
+    override def combineK[A](x: Under[M, A], y: Under[M, A]): Under[M, A] = Under(Monoid[M].combine(x.getUnder, y.getUnder))
+  }
 }
